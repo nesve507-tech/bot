@@ -8,6 +8,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
+from bson import ObjectId
 
 from bot.config import Settings
 from bot.db import Database
@@ -27,6 +28,11 @@ class AddProductState(StatesGroup):
 
 class BroadcastState(StatesGroup):
     body = State()
+
+
+class AddStockState(StatesGroup):
+    product = State()
+    stock = State()
 
 
 def _is_admin(user_id: int, settings: Settings) -> bool:
@@ -52,6 +58,19 @@ def _parse_stock_lines(raw: str) -> list[dict[str, str]]:
     return result
 
 
+async def _find_product_for_stock(db: Database, raw: str) -> dict | None:
+    token = raw.strip()
+    if not token:
+        return None
+
+    if ObjectId.is_valid(token):
+        product = await db.collections.products.find_one({"_id": ObjectId(token)})
+        if product:
+            return product
+
+    return await db.collections.products.find_one({"name": token})
+
+
 @router.message(F.text == "Admin Panel")
 @router.message(Command("admin"))
 async def admin_panel_cmd(message: Message, settings: Settings) -> None:
@@ -63,6 +82,7 @@ async def admin_panel_cmd(message: Message, settings: Settings) -> None:
             [
                 "Admin commands:",
                 "- /add_product",
+                "- /add_stock",
                 "- /approve ORDXXXX",
                 "- /broadcast",
                 "- /stats",
@@ -127,6 +147,63 @@ async def add_product_stock(message: Message, state: FSMContext, db: Database) -
 
     await state.clear()
     await message.answer("Them san pham thanh cong.")
+
+
+@router.message(Command("add_stock"))
+async def add_stock_start(message: Message, settings: Settings, state: FSMContext) -> None:
+    if not _is_admin(message.from_user.id, settings):
+        await message.answer("Ban khong co quyen.")
+        return
+    await state.set_state(AddStockState.product)
+    await message.answer("Nhap Product ID hoac ten san pham can nap them stock:")
+
+
+@router.message(AddStockState.product)
+async def add_stock_product(message: Message, state: FSMContext, db: Database) -> None:
+    product = await _find_product_for_stock(db, message.text)
+    if not product:
+        await message.answer("Khong tim thay san pham. Nhap lai Product ID hoac ten chinh xac:")
+        return
+
+    await state.update_data(product_id=str(product["_id"]), product_name=product["name"])
+    await state.set_state(AddStockState.stock)
+    await message.answer(
+        f"San pham: {product['name']}\n"
+        "Nhap stock moi, moi dong 1 item. Co the dung format: content|note"
+    )
+
+
+@router.message(AddStockState.stock)
+async def add_stock_items(message: Message, settings: Settings, state: FSMContext, db: Database) -> None:
+    if not _is_admin(message.from_user.id, settings):
+        await state.clear()
+        await message.answer("Ban khong co quyen.")
+        return
+
+    data = await state.get_data()
+    stock = _parse_stock_lines(message.text)
+    if not stock:
+        await message.answer("Stock rong. Nhap lai.")
+        return
+
+    product_id = data.get("product_id")
+    if not product_id or not ObjectId.is_valid(product_id):
+        await state.clear()
+        await message.answer("Session het han. Vui long /add_stock lai.")
+        return
+
+    res = await db.collections.products.update_one(
+        {"_id": ObjectId(product_id)},
+        {"$push": {"stock": {"$each": stock}}},
+    )
+    await state.clear()
+    if res.modified_count != 1:
+        await message.answer("Khong the them stock (san pham co the da bi xoa).")
+        return
+
+    await message.answer(
+        f"Da them {len(stock)} stock vao san pham {data.get('product_name', product_id)} thanh cong."
+    )
 
 
 @router.message(Command("approve"))
