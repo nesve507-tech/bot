@@ -14,6 +14,7 @@ from bot.config import Settings
 from bot.db import Database
 from bot.keyboards.menu import main_menu
 from bot.services.payment import complete_order
+from bot.utils.action_log import log_action
 
 logger = logging.getLogger(__name__)
 
@@ -218,6 +219,7 @@ async def approve_order_cmd(message: Message, settings: Settings, db: Database) 
         return
 
     order_id = chunks[1].strip()
+    log_action(message.from_user.id, f"Attempted approve {order_id}")
     done = await complete_order(
         bot=message.bot,
         users_col=db.collections.users,
@@ -226,6 +228,10 @@ async def approve_order_cmd(message: Message, settings: Settings, db: Database) 
         order_id=order_id,
         source=f"admin_{message.from_user.id}",
     )
+    if done:
+        log_action(message.from_user.id, f"Approved order {order_id}")
+    else:
+        log_action(message.from_user.id, f"Approve failed for {order_id}")
     await message.answer("Da approve don hang." if done else "Approve that bai (co the don khong ton tai/het stock).")
 
 

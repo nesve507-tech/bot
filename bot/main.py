@@ -16,6 +16,7 @@ from bot.handlers.dashboard import router as dashboard_router
 from bot.handlers.payment import router as payment_router
 from bot.handlers.user import router as user_router
 from bot.services.anti_spam import AntiSpamMiddleware, AntiSpamService
+from bot.utils.action_log import log_action
 
 
 def configure_logging() -> None:
@@ -55,6 +56,12 @@ async def run() -> None:
         update = event.update
         message = getattr(update, "message", None)
         callback = getattr(update, "callback_query", None)
+        user_id = None
+        if message and message.from_user:
+            user_id = message.from_user.id
+        elif callback and callback.from_user:
+            user_id = callback.from_user.id
+        log_action(user_id, f"Unhandled error: {event.exception}", logging.ERROR)
         if message:
             await message.answer("He thong dang ban. Vui long thu lai sau.")
         elif callback:

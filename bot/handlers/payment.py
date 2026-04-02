@@ -8,6 +8,7 @@ from aiogram.types import CallbackQuery, Message
 
 from bot.config import Settings
 from bot.db import Database
+from bot.utils.action_log import log_action
 
 router = Router(name="payment")
 
@@ -39,6 +40,7 @@ async def _notify_admins_for_order(
             await message.bot.send_message(admin_id, text)
         except Exception:
             # Skip failed admin destinations to keep flow resilient.
+            log_action(order.get("user_id"), f"Failed notifying admin {admin_id} for order {order.get('_id')}")
             continue
 
 
@@ -73,6 +75,7 @@ async def _submit_payment_request(
 @router.callback_query(F.data.startswith("paid_"))
 async def i_have_paid_callback(callback: CallbackQuery, db: Database, settings: Settings) -> None:
     order_id = callback.data.replace("paid_", "", 1)
+    log_action(callback.from_user.id, f"Clicked I have paid for {order_id}")
     ok, msg = await _submit_payment_request(
         actor_user_id=callback.from_user.id,
         order_id=order_id,
@@ -80,6 +83,8 @@ async def i_have_paid_callback(callback: CallbackQuery, db: Database, settings: 
         settings=settings,
         event=callback,
     )
+    if ok:
+        log_action(callback.from_user.id, f"Submitted payment proof for {order_id}")
     await callback.answer(msg, show_alert=not ok)
 
 
@@ -91,6 +96,7 @@ async def paid_cmd(message: Message, db: Database, settings: Settings) -> None:
         return
 
     order_id = chunks[1].strip()
+    log_action(message.from_user.id, f"Ran /paid for {order_id}")
     ok, msg = await _submit_payment_request(
         actor_user_id=message.from_user.id,
         order_id=order_id,
@@ -98,6 +104,8 @@ async def paid_cmd(message: Message, db: Database, settings: Settings) -> None:
         settings=settings,
         event=message,
     )
+    if ok:
+        log_action(message.from_user.id, f"Submitted payment proof for {order_id}")
     await message.answer(msg)
 
 

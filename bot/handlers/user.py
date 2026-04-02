@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timezone
 
 from aiogram import F, Router
@@ -12,8 +11,7 @@ from bot.db import Database
 from bot.keyboards.menu import main_menu, payment_kb, product_list_kb
 from bot.services.delivery import get_product, list_products
 from bot.services.payment import build_vietqr_url, create_order
-
-logger = logging.getLogger(__name__)
+from bot.utils.action_log import log_action
 
 router = Router(name="user")
 
@@ -64,6 +62,7 @@ async def start_cmd(
         "Chao mung ban den voi Shop Bot.\nChon menu ben duoi de xem san pham va mua hang.",
         reply_markup=main_menu(is_admin=user_id in settings.admin_ids),
     )
+    log_action(user_id, "/start")
 
 
 @router.message(F.text == "San pham")
@@ -110,7 +109,7 @@ async def buy_product_callback(callback: CallbackQuery, db: Database, settings: 
         reply_markup=payment_kb(order_id=order["_id"], qr_url=qr_url),
     )
     await callback.answer("Da tao don hang")
-    logger.info("Order created", extra={"order_id": order["_id"], "user_id": callback.from_user.id})
+    log_action(callback.from_user.id, f"Created order {order['_id']}")
 
 
 @router.message(F.text == "Don cua toi")
