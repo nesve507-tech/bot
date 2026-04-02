@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Overview</h1>
+<div class="cards">
+  <div class="card"><h3>Total Users</h3><p id="total_users">{{ stats.total_users }}</p></div>
+  <div class="card"><h3>Total Orders</h3><p id="total_orders">{{ stats.total_orders }}</p></div>
+  <div class="card"><h3>Total Revenue</h3><p id="total_revenue">{{ stats.total_revenue }}</p></div>
+  <div class="card"><h3>Revenue Today</h3><p id="revenue_today">{{ stats.revenue_today }}</p></div>
+  <div class="card"><h3>Orders Today</h3><p id="orders_today">{{ stats.orders_today }}</p></div>
+</div>
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>Revenue Daily</h2>
+    <canvas id="revenueChart"></canvas>
+  </section>
+  <section class="panel">
+    <h2>Orders Daily</h2>
+    <canvas id="ordersChart"></canvas>
+  </section>
+</div>
+
+<script>
+  async function loadStats() {
+    const resp = await fetch('/api/stats');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    for (const key of ['total_users', 'total_orders', 'total_revenue', 'revenue_today', 'orders_today']) {
+      const el = document.getElementById(key);
+      if (el) el.textContent = data[key] ?? 0;
+    }
+  }
+
+  async function loadRevenue() {
+    const resp = await fetch('/api/revenue?days=30');
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    const shared = {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#d6d6e2' } } },
+      scales: {
+        x: { ticks: { color: '#a7a7bb' }, grid: { color: '#2a2a3f' } },
+        y: { ticks: { color: '#a7a7bb' }, grid: { color: '#2a2a3f' } },
+      },
+    };
+
+    new Chart(document.getElementById('revenueChart'), {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          label: 'Revenue',
+          data: data.revenue,
+          borderColor: '#45c29b',
+          backgroundColor: 'rgba(69, 194, 155, 0.25)',
+          fill: true,
+          tension: 0.25,
+        }]
+      },
+      options: shared,
+    });
+
+    new Chart(document.getElementById('ordersChart'), {
+      type: 'bar',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          label: 'Orders',
+          data: data.orders,
+          backgroundColor: '#2f80ed',
+          borderRadius: 6,
+        }]
+      },
+      options: shared,
+    });
+  }
+
+  loadStats();
+  loadRevenue();
+</script>
+{% endblock %}

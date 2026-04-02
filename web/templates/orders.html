@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Orders</h1>
+<div class="toolbar">
+  <select id="status">
+    <option value="">All status</option>
+    <option value="pending">pending</option>
+    <option value="done">done</option>
+  </select>
+  <input id="q" type="text" placeholder="Search order_id or user_id" />
+  <button onclick="loadOrders(1)">Filter</button>
+</div>
+
+<section class="panel">
+  <table>
+    <thead>
+      <tr>
+        <th>Order</th>
+        <th>User</th>
+        <th>Amount</th>
+        <th>Status</th>
+        <th>Paid</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="pager">
+    <button id="prev" onclick="changePage(-1)">Prev</button>
+    <span id="page_info"></span>
+    <button id="next" onclick="changePage(1)">Next</button>
+  </div>
+</section>
+
+<script>
+  let page = 1;
+  let totalPages = 1;
+
+  async function loadOrders(nextPage) {
+    page = nextPage;
+    const params = new URLSearchParams({ page: String(page), page_size: '20' });
+    const status = document.getElementById('status').value;
+    const q = document.getElementById('q').value.trim();
+    if (status) params.set('status', status);
+    if (q) params.set('q', q);
+
+    const resp = await fetch('/api/orders?' + params.toString());
+    if (!resp.ok) return;
+    const data = await resp.json();
+    totalPages = data.total_pages || 1;
+
+    const rows = document.getElementById('rows');
+    rows.innerHTML = '';
+    for (const item of data.items) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${item.order_id}</td>
+        <td>${item.user_id}</td>
+        <td>${item.amount}</td>
+        <td><span class="badge ${item.status}">${item.status}</span></td>
+        <td>${item.paid ? 'Yes' : 'No'}</td>
+        <td>${item.created_at || ''}</td>
+      `;
+      rows.appendChild(tr);
+    }
+
+    document.getElementById('page_info').textContent = `Page ${data.page} / ${data.total_pages || 1}`;
+    document.getElementById('prev').disabled = data.page <= 1;
+    document.getElementById('next').disabled = data.page >= (data.total_pages || 1);
+  }
+
+  function changePage(delta) {
+    const next = page + delta;
+    if (next < 1 || next > totalPages) return;
+    loadOrders(next);
+  }
+
+  loadOrders(1);
+</script>
+{% endblock %}

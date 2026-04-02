@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Referral Analytics</h1>
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>Top Referrers (F1)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>User ID</th>
+          <th>F1 Count</th>
+          <th>Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in top_refs %}
+        <tr>
+          <td>{{ item.user_id }}</td>
+          <td>{{ item.f1_count }}</td>
+          <td>{{ item.balance }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>Referral Trend</h2>
+    <canvas id="refChart"></canvas>
+  </section>
+</div>
+
+<script>
+  const topRefs = {{ top_refs | tojson }};
+  const labels = topRefs.map(x => String(x.user_id));
+  const values = topRefs.map(x => x.f1_count);
+
+  new Chart(document.getElementById('refChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'F1 Referrals',
+        data: values,
+        backgroundColor: '#f39c12',
+        borderRadius: 6,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#d6d6e2' } } },
+      scales: {
+        x: { ticks: { color: '#a7a7bb' }, grid: { color: '#2a2a3f' } },
+        y: { ticks: { color: '#a7a7bb' }, grid: { color: '#2a2a3f' } },
+      },
+    },
+  });
+</script>
+{% endblock %}

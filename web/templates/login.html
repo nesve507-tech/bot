@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Login</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body class="login-body">
+    <div class="login-card">
+      <h1>Dashboard Login</h1>
+      <p>Enter admin key to continue</p>
+      {% if error %}
+      <div class="error">{{ error }}</div>
+      {% endif %}
+      <form method="post" action="/login">
+        <label for="admin_key">Admin Key</label>
+        <input type="password" id="admin_key" name="admin_key" required />
+        <button type="submit">Login</button>
+      </form>
+      <p class="muted">Optional quick login: <code>/tg-login?token=WEB_ADMIN_KEY</code></p>
+    </div>
+  </body>
+</html>

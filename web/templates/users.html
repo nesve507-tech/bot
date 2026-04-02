@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Users</h1>
+
+<section class="panel">
+  <table>
+    <thead>
+      <tr>
+        <th>User ID</th>
+        <th>Balance</th>
+        <th>Ref By</th>
+        <th>F1 Count</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="pager">
+    <button id="prev" onclick="changePage(-1)">Prev</button>
+    <span id="page_info"></span>
+    <button id="next" onclick="changePage(1)">Next</button>
+  </div>
+</section>
+
+<script>
+  let page = 1;
+  let totalPages = 1;
+
+  async function loadUsers(nextPage) {
+    page = nextPage;
+    const params = new URLSearchParams({ page: String(page), page_size: '20' });
+    const resp = await fetch('/api/users?' + params.toString());
+    if (!resp.ok) return;
+    const data = await resp.json();
+    totalPages = data.total_pages || 1;
+
+    const rows = document.getElementById('rows');
+    rows.innerHTML = '';
+    for (const item of data.items) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${item.user_id}</td>
+        <td>${item.balance}</td>
+        <td>${item.ref_by ?? '-'}</td>
+        <td>${item.f1_count}</td>
+      `;
+      rows.appendChild(tr);
+    }
+
+    document.getElementById('page_info').textContent = `Page ${data.page} / ${data.total_pages || 1}`;
+    document.getElementById('prev').disabled = data.page <= 1;
+    document.getElementById('next').disabled = data.page >= (data.total_pages || 1);
+  }
+
+  function changePage(delta) {
+    const next = page + delta;
+    if (next < 1 || next > totalPages) return;
+    loadUsers(next);
+  }
+
+  loadUsers(1);
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: telegram-shop-dashboard
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn web.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB_NAME
+        value: telegram_shop
+      - key: WEB_ADMIN_KEY
+        sync: false
+      - key: WEB_SESSION_SECRET
+        sync: false

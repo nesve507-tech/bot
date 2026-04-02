@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ title or 'Dashboard' }}</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="brand">Shop Admin</div>
+        <nav>
+          <a href="/dashboard" class="nav-link {% if active == 'dashboard' %}active{% endif %}">Dashboard</a>
+          <a href="/orders" class="nav-link {% if active == 'orders' %}active{% endif %}">Orders</a>
+          <a href="/users" class="nav-link {% if active == 'users' %}active{% endif %}">Users</a>
+          <a href="/analytics" class="nav-link {% if active == 'analytics' %}active{% endif %}">Analytics</a>
+        </nav>
+        <a class="logout" href="/logout">Logout</a>
+      </aside>
+
+      <main class="content">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </body>
+</html>
