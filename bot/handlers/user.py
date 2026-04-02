@@ -104,7 +104,7 @@ async def buy_product_callback(callback: CallbackQuery, db: Database, settings: 
                 f"So tien: {int(product['price'])} VND",
                 "Noi dung CK: dung chinh xac ma don hang.",
                 f"Noi dung: {order['_id']}",
-                "Nhan 'Kiem tra thanh toan' sau khi chuyen khoan.",
+                "Sau khi chuyen khoan, nhan 'I have paid' de bao admin duyet don.",
             ]
         ),
         reply_markup=payment_kb(order_id=order["_id"], qr_url=qr_url),

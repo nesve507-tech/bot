@@ -29,6 +29,6 @@ def product_list_kb(products: list[dict]) -> InlineKeyboardMarkup:
 def payment_kb(order_id: str, qr_url: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Mo QR", url=qr_url)
-    builder.button(text="Kiem tra thanh toan", callback_data=f"checkpay_{order_id}")
+    builder.button(text="I have paid", callback_data=f"paid_{order_id}")
     builder.adjust(1)
     return builder.as_markup()

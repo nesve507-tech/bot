@@ -1,40 +1,104 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from bot.config import Settings
 from bot.db import Database
-from bot.services.payment import check_and_complete_one_order
 
 router = Router(name="payment")
 
 
-@router.callback_query(F.data.startswith("checkpay_"))
-async def check_payment_callback(callback: CallbackQuery, db: Database, settings: Settings) -> None:
-    order_id = callback.data.replace("checkpay_", "", 1)
-    order = await db.collections.orders.find_one({"_id": order_id, "user_id": callback.from_user.id})
+async def _notify_admins_for_order(
+    message: Message | CallbackQuery,
+    db: Database,
+    settings: Settings,
+    order: dict,
+) -> None:
+    product_name = "Unknown"
+    product = await db.collections.products.find_one({"_id": order.get("product_id")}, {"name": 1})
+    if product:
+        product_name = product.get("name", "Unknown")
+
+    text = "\n".join(
+        [
+            "Yeu cau xac nhan thanh toan moi:",
+            f"- Order: {order['_id']}",
+            f"- User: {order['user_id']}",
+            f"- Product: {product_name}",
+            f"- Amount: {order['amount']} VND",
+            f"- Approve: /approve {order['_id']}",
+        ]
+    )
+
+    for admin_id in settings.admin_ids:
+        try:
+            await message.bot.send_message(admin_id, text)
+        except Exception:
+            # Skip failed admin destinations to keep flow resilient.
+            continue
+
+
+async def _submit_payment_request(
+    *,
+    actor_user_id: int,
+    order_id: str,
+    db: Database,
+    settings: Settings,
+    event: Message | CallbackQuery,
+) -> tuple[bool, str]:
+    order = await db.collections.orders.find_one({"_id": order_id, "user_id": actor_user_id})
     if not order:
-        await callback.answer("Khong tim thay don cua ban.", show_alert=True)
-        return
+        return False, "Khong tim thay don cua ban."
 
     if order.get("status") == "done":
-        await callback.answer("Don nay da hoan thanh.", show_alert=True)
+        return False, "Don nay da hoan thanh."
+
+    # Idempotent flag to avoid duplicate admin spam for the same pending order.
+    updated = await db.collections.orders.update_one(
+        {"_id": order_id, "status": "pending", "payment_requested_at": {"$exists": False}},
+        {"$set": {"payment_requested_at": datetime.now(tz=timezone.utc)}},
+    )
+
+    if updated.modified_count == 0:
+        return False, "Ban da gui yeu cau truoc do. Vui long doi admin duyet."
+
+    await _notify_admins_for_order(event, db, settings, order)
+    return True, "Da gui yeu cau xac nhan thanh toan cho admin."
+
+
+@router.callback_query(F.data.startswith("paid_"))
+async def i_have_paid_callback(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    order_id = callback.data.replace("paid_", "", 1)
+    ok, msg = await _submit_payment_request(
+        actor_user_id=callback.from_user.id,
+        order_id=order_id,
+        db=db,
+        settings=settings,
+        event=callback,
+    )
+    await callback.answer(msg, show_alert=not ok)
+
+
+@router.message(Command("paid"))
+async def paid_cmd(message: Message, db: Database, settings: Settings) -> None:
+    chunks = message.text.split(maxsplit=1)
+    if len(chunks) != 2:
+        await message.answer("Dung: /paid ORDXXXX")
         return
 
-    done = await check_and_complete_one_order(
-        bot=callback.bot,
+    order_id = chunks[1].strip()
+    ok, msg = await _submit_payment_request(
+        actor_user_id=message.from_user.id,
+        order_id=order_id,
+        db=db,
         settings=settings,
-        users_col=db.collections.users,
-        products_col=db.collections.products,
-        orders_col=db.collections.orders,
-        order=order,
+        event=message,
     )
-    if done:
-        await callback.answer("Thanh toan da duoc xac nhan.", show_alert=True)
-    else:
-        await callback.answer("Chua tim thay giao dich phu hop.", show_alert=True)
+    await message.answer(msg)
 
 
 @router.message(Command("order"))

@@ -16,7 +16,6 @@ from bot.handlers.dashboard import router as dashboard_router
 from bot.handlers.payment import router as payment_router
 from bot.handlers.user import router as user_router
 from bot.services.anti_spam import AntiSpamMiddleware, AntiSpamService
-from bot.services.payment import payment_checker_loop
 
 
 def configure_logging() -> None:
@@ -62,23 +61,9 @@ async def run() -> None:
             await callback.answer("Co loi xay ra, thu lai sau.", show_alert=True)
         return True
 
-    stop_event = asyncio.Event()
-    payment_task = asyncio.create_task(
-        payment_checker_loop(
-            bot=bot,
-            settings=settings,
-            users_col=db.collections.users,
-            products_col=db.collections.products,
-            orders_col=db.collections.orders,
-            stop_event=stop_event,
-        )
-    )
-
     try:
         await dp.start_polling(bot, db=db, settings=settings)
     finally:
-        stop_event.set()
-        await payment_task
         db.close()
         await bot.session.close()
 

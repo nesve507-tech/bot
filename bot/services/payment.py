@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import random
 import string
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote_plus
 
@@ -70,7 +69,7 @@ async def complete_order(
     products_col: AsyncIOMotorCollection,
     orders_col: AsyncIOMotorCollection,
     order_id: str,
-    source: str = "payment_checker",
+    source: str = "manual_approval",
 ) -> bool:
     order = await orders_col.find_one({"_id": order_id})
     if not order:
@@ -151,85 +150,3 @@ async def complete_order(
 
     logger.info("Order completed", extra={"order_id": order_id, "source": source})
     return True
-
-
-async def find_matching_transactions(settings: Settings) -> list[dict[str, Any]]:
-    """
-    Placeholder for real bank API integration.
-    Return schema example:
-    [{"content": "ORDABC123", "amount": 100000, "created_at": datetime(...)}]
-    """
-    if settings.payment_api_url:
-        # TODO: call real payment API here.
-        return []
-
-    return []
-
-
-async def check_and_complete_one_order(
-    bot: Bot,
-    settings: Settings,
-    users_col: AsyncIOMotorCollection,
-    products_col: AsyncIOMotorCollection,
-    orders_col: AsyncIOMotorCollection,
-    order: dict[str, Any],
-) -> bool:
-    order_id = order["_id"]
-
-    txs = await find_matching_transactions(settings)
-    for tx in txs:
-        if str(tx.get("content", "")).strip() == order_id and int(tx.get("amount", 0)) == int(order["amount"]):
-            return await complete_order(
-                bot=bot,
-                users_col=users_col,
-                products_col=products_col,
-                orders_col=orders_col,
-                order_id=order_id,
-                source="payment_api",
-            )
-
-    if settings.payment_mock_enabled:
-        created_at: datetime = order.get("created_at") or datetime.now(tz=timezone.utc)
-        if datetime.now(tz=timezone.utc) >= created_at + timedelta(seconds=settings.payment_mock_after_sec):
-            return await complete_order(
-                bot=bot,
-                users_col=users_col,
-                products_col=products_col,
-                orders_col=orders_col,
-                order_id=order_id,
-                source="mock_payment",
-            )
-
-    return False
-
-
-async def payment_checker_loop(
-    bot: Bot,
-    settings: Settings,
-    users_col: AsyncIOMotorCollection,
-    products_col: AsyncIOMotorCollection,
-    orders_col: AsyncIOMotorCollection,
-    stop_event: asyncio.Event,
-) -> None:
-    logger.info("Payment checker loop started")
-    while not stop_event.is_set():
-        try:
-            cursor = orders_col.find({"status": "pending", "paid": False}).sort("created_at", 1)
-            async for order in cursor:
-                await check_and_complete_one_order(
-                    bot=bot,
-                    settings=settings,
-                    users_col=users_col,
-                    products_col=products_col,
-                    orders_col=orders_col,
-                    order=order,
-                )
-        except Exception:
-            logger.exception("Error in payment checker loop")
-
-        try:
-            await asyncio.wait_for(stop_event.wait(), timeout=settings.payment_check_interval_sec)
-        except asyncio.TimeoutError:
-            pass
-
-    logger.info("Payment checker loop stopped")
